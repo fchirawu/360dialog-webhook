@@ -109,7 +109,12 @@ def send():
                 "D360-API-KEY": D360_API_KEY,
                 "Content-Type": "application/json",
             },
-            json={"to": to, "type": "text", "text": {"body": text}},
+            json={
+                "messaging_product": "whatsapp",
+                "to": to,
+                "type": "text",
+                "text": {"body": text},
+            },
             timeout=15,
         )
     except requests.RequestException as err:
