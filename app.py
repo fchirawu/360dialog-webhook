@@ -1,5 +1,5 @@
 """
-plus263 WhatsApp Webhook Receiver (360dialog)
+Kuzuva WhatsApp Webhook Receiver (360dialog)
 ------------------------------------------------
 Receives incoming WhatsApp messages forwarded by 360dialog, logs them to
 disk, and exposes a /messages endpoint to view everything received so far.
@@ -126,7 +126,7 @@ def list_messages():
 
 @app.route("/")
 def health():
-    return jsonify({"status": "plus263 webhook is running", "message_count": len(received_messages)})
+    return jsonify({"status": "Kuzuva webhook is running", "message_count": len(received_messages)})
 
 
 if __name__ == "__main__":
