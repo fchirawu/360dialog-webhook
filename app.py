@@ -47,6 +47,12 @@ D360_BASE_URL = "https://waba-v2.360dialog.io"
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 
+ESCALATION_PHONE = "263710386194"  # Farai's personal Zim number
+ESCALATION_KEYWORDS = [
+    "price", "pricing", "quote", "cost", "how much", "sign up",
+    "get started", "talk to farai", "speak to farai", "human", "agent",
+]
+
 SESSION_WINDOW_SECONDS = 24 * 60 * 60  # WhatsApp's 24h free-form reply rule
 
 SYSTEM_PROMPT = """You are the WhatsApp assistant for Kuzuva Technology, a
@@ -116,7 +122,8 @@ def init_db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS contacts (
             phone TEXT PRIMARY KEY,
-            last_user_message_at REAL
+            last_user_message_at REAL,
+            escalated INTEGER DEFAULT 0
         )
     """)
     conn.commit()
@@ -161,6 +168,49 @@ def within_24h_window(phone):
     if not row or row[0] is None:
         return False
     return (time.time() - row[0]) < SESSION_WINDOW_SECONDS
+
+
+def already_escalated(phone):
+    conn = sqlite3.connect(DB_PATH)
+    row = conn.execute(
+        "SELECT escalated FROM contacts WHERE phone = ?", (phone,)
+    ).fetchone()
+    conn.close()
+    return bool(row and row[0])
+
+
+def mark_escalated(phone):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        """INSERT INTO contacts (phone, escalated) VALUES (?, 1)
+           ON CONFLICT(phone) DO UPDATE SET escalated=1""",
+        (phone,),
+    )
+    conn.commit()
+    conn.close()
+
+
+def maybe_escalate(phone, text):
+    """
+    Keyword-based trigger. Only fires once per contact so Farai isn't
+    spammed on every follow-up message in the same conversation.
+    Sends a WhatsApp alert to ESCALATION_PHONE -- note this only delivers
+    if that number has messaged the Kuzuva business number within the
+    last 24h, per WhatsApp's session window rule.
+    """
+    if already_escalated(phone):
+        return False
+    if not any(kw in text.lower() for kw in ESCALATION_KEYWORDS):
+        return False
+
+    mark_escalated(phone)
+    alert = f"Kuzuva WhatsApp lead: {phone} may need you personally.\nMessage: {text}"
+    try:
+        result, status = send_whatsapp_message(ESCALATION_PHONE, alert)
+        print(f"Escalation alert sent: status={status} result={result}")
+    except Exception as err:
+        print(f"Escalation alert failed to send: {err}")
+    return True
 
 
 # ---------------------------------------------------------------------
@@ -230,10 +280,15 @@ def receive():
 
                     save_message(sender, "user", text)
 
+                    escalated = maybe_escalate(sender, text)
+
                     reply = get_ai_reply(sender, text)
                     if reply is None:
                         print("ANTHROPIC_API_KEY not set -- skipping AI reply")
                         continue
+
+                    if escalated:
+                        reply += "\n\nI've let Farai know -- he'll follow up with you directly."
 
                     save_message(sender, "assistant", reply)
 
