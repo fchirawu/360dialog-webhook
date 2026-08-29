@@ -107,12 +107,13 @@ SKILLS = [
             "At the start of a new conversation (first message from a phone "
             "number with no prior history), the bot must identify itself as "
             "an AI assistant before anything else -- e.g. 'Hi, you're chatting "
-            "with Zuzu, Kuzuva's AI assistant.' Never let the customer believe "
+            "with Kuzuva's AI assistant.' Never let the customer believe "
             "they are speaking with a human. If asked directly 'are you a "
             "bot?' or 'am I talking to a real person?', always confirm "
-            "honestly that they are speaking with Zuzu, an AI assistant -- "
-            "not an 'agent', since Zuzu can't yet take actions like booking "
-            "or looking things up, only answer questions."
+            "honestly that they are speaking with an AI assistant -- not an "
+            "'agent', since it can't yet take actions like booking or looking "
+            "things up, only answer questions. Do not give the assistant a "
+            "personal name."
         ),
     },
 ]
