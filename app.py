@@ -199,7 +199,10 @@ def get_ai_reply(phone, incoming_text):
         system=SYSTEM_PROMPT,
         messages=messages,
     )
-    return response.content[0].text
+    for block in response.content:
+        if getattr(block, "type", None) == "text":
+            return block.text
+    return None
 
 
 # ---------------------------------------------------------------------
