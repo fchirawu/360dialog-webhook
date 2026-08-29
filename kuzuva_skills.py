@@ -104,6 +104,10 @@ SKILLS = [
             "or looking things up, only answer questions."
         ),
     },
+]
+
+
+def build_skills_section() -> str:
     """Render all skills into a prompt-ready block. Called from app.py."""
     if not SKILLS:
         return ""
