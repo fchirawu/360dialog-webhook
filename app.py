@@ -132,6 +132,12 @@ def init_db():
             escalated INTEGER DEFAULT 0
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS processed_wamids (
+            wamid TEXT PRIMARY KEY,
+            processed_at REAL NOT NULL
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -174,6 +180,35 @@ def within_24h_window(phone):
     if not row or row[0] is None:
         return False
     return (time.time() - row[0]) < SESSION_WINDOW_SECONDS
+
+
+def already_processed(wamid):
+    """
+    Checks whether this exact WhatsApp message id has been handled before.
+    360dialog/WhatsApp can redeliver the same webhook payload (e.g. if the
+    first response was slow), which without this check causes the bot to
+    generate and send two different AI replies to one customer message.
+    """
+    if not wamid:
+        return False
+    conn = sqlite3.connect(DB_PATH)
+    row = conn.execute(
+        "SELECT 1 FROM processed_wamids WHERE wamid = ?", (wamid,)
+    ).fetchone()
+    conn.close()
+    return row is not None
+
+
+def mark_processed(wamid):
+    if not wamid:
+        return
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "INSERT OR IGNORE INTO processed_wamids (wamid, processed_at) VALUES (?, ?)",
+        (wamid, time.time()),
+    )
+    conn.commit()
+    conn.close()
 
 
 # ---------------------------------------------------------------------
@@ -282,12 +317,18 @@ def receive():
             for change in e.get("changes", []):
                 value = change.get("value", {})
                 for m in value.get("messages", []):
+                    wamid = m.get("id")
                     sender = m.get("from")
                     text = m.get("text", {}).get("body")
                     print(f"[{entry['received_at']}] New message from {sender}: {text}")
 
                     if not sender or not text:
                         continue
+
+                    if already_processed(wamid):
+                        print(f"Duplicate webhook delivery for wamid={wamid} -- skipping")
+                        continue
+                    mark_processed(wamid)
 
                     save_message(sender, "user", text)
 
